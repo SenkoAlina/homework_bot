@@ -40,9 +40,9 @@ def send_message(bot, message):
     try:
         bot.send_message(TELEGRAM_CHAT_ID, message)
         logger.info('Сообщение отправлено')
-    except Exception as error:
+    except telegram.error.TelegramError as error:
         message = f'Ошибка при отправке сообщения {error}'
-        raise telegram.error.TelegramError(message)
+        raise LightError(message)
 
 
 def get_api_answer(current_timestamp):
@@ -56,7 +56,7 @@ def get_api_answer(current_timestamp):
                 f'Неожиданный ответ сервера: {response.status_code}')
         return response.json()
     except requests.ConnectionError as error:
-        raise LightError(
+        raise Exception(
             'Ошибка при запросе к эндпоинту API-сервиса') from error
 
 
@@ -78,10 +78,10 @@ def parse_status(homework):
     """Получение статуса домашней работы."""
     if 'homework_name' not in homework:
         message = "Отсутствует поле 'homework_name' в ответе API"
-        raise KeyLightError(message)
+        raise KeyError(message)
     if 'status' not in homework:
         message = "Отсутствует поле 'status' в ответе API"
-        raise KeyLightError(message)
+        raise KeyError(message)
     homework_name = homework['homework_name']
     homework_status = homework['status']
     if homework_status not in HOMEWORK_STATUSES:
@@ -93,10 +93,7 @@ def parse_status(homework):
 
 def check_tokens():
     """Проверка переменных окружения."""
-    if all([TELEGRAM_TOKEN, TELEGRAM_CHAT_ID, PRACTICUM_TOKEN]):
-        return True
-    else:
-        return False
+    return all([TELEGRAM_TOKEN, TELEGRAM_CHAT_ID, PRACTICUM_TOKEN])
 
 
 def main():
@@ -113,12 +110,12 @@ def main():
             response = get_api_answer(current_timestamp)
             homeworks = check_response(response)
             if homeworks:
-                status = parse_status(homeworks[-1])
+                status = parse_status(homeworks[0])
                 send_message(bot, status)
             else:
                 logger.debug('Новые статусы отсутвуют')
 
-            current_timestamp = response.get('current_date')
+            current_timestamp = response.get('current_date', int(time.time()))
 
         except LightError as error:
             logger.error(error)
